@@ -3,7 +3,7 @@ use shakmaty_syzygy::Wdl;
 use std::mem::{self, MaybeUninit};
 use std::ptr;
 
-use crate::math;
+use crate::{math, nnue_eval::NNUEState};
 use crate::search::SCALE;
 use crate::state::{self, State};
 use crate::tablebase::probe_tablebase_wdl;
@@ -120,23 +120,7 @@ fn run_nets(state: &State, moves: &MoveList) -> (f32, Vec<f32>) {
         evalns.push(0.);
     }
 
-    let mut hidden_layer: [f32; NUMBER_HIDDEN] = unsafe {
-        let mut out: [MaybeUninit<f32>; NUMBER_HIDDEN] = MaybeUninit::uninit().assume_init();
-
-        ptr::copy_nonoverlapping(
-            EVAL_HIDDEN_BIAS.as_ptr(),
-            out.as_mut_ptr().cast::<f32>(),
-            NUMBER_HIDDEN,
-        );
-
-        mem::transmute(out)
-    };
-
     state.features_map(|idx| {
-        for (j, l) in hidden_layer.iter_mut().enumerate() {
-            *l += EVAL_HIDDEN_WEIGHTS[idx][j];
-        }
-
         for m in 0..moves.len() {
             evalns[m] += POLICY_WEIGHTS[move_idxs[m]][idx];
         }
@@ -144,12 +128,14 @@ fn run_nets(state: &State, moves: &MoveList) -> (f32, Vec<f32>) {
 
     math::softmax(&mut evalns);
 
-    let mut result = 0.;
-    let weights = EVAL_OUTPUT_WEIGHTS[0];
+    let mut nnue_buffer = NNUEState::new();
+    let raw_value = nnue_buffer.forward(state.board());
+    // double the eval so that we can apply sigmoid but get tanh
+    let raw_value_for_sigmoid = raw_value as f32 * 2.;
+    // apply sigmoid
+    let value = 1. / (1. + fastapprox::faster::exp(-raw_value_for_sigmoid));
+    // shift into [-1, 1]
+    let value = 2. * value - 1.;
 
-    for i in 0..hidden_layer.len() {
-        result += weights[i] * hidden_layer[i].max(0.);
-    }
-
-    (result.tanh(), evalns)
+    (value, evalns)
 }

@@ -35,6 +35,7 @@ mod search;
 mod state;
 mod training;
 mod uci;
+mod nnue_eval;
 
 fn main() {
     args::init();
