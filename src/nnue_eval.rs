@@ -135,13 +135,7 @@ impl NNUEState {
             }
         }
 
-        let pov_eval = self.accumulator.evaluate(board.turn());
-
-        if board.turn() == Color::Black {
-            -pov_eval
-        } else {
-            pov_eval
-        }
+        self.accumulator.evaluate(board.turn())
     }
 
     /// Update by activating or deactivating a piece.

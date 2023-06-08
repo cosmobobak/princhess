@@ -1,7 +1,5 @@
 use shakmaty::{MoveList, Position};
 use shakmaty_syzygy::Wdl;
-use std::mem::{self, MaybeUninit};
-use std::ptr;
 
 use crate::{math, nnue_eval::NNUEState};
 use crate::search::SCALE;
@@ -84,21 +82,6 @@ pub fn evaluate_new_state(state: &State, moves: &MoveList) -> (Vec<f32>, Evaluat
             .fold_wb(state_evaluation, state_evaluation.flip()),
     )
 }
-
-const STATE_NUMBER_INPUTS: usize = state::NUMBER_FEATURES;
-const NUMBER_HIDDEN: usize = 192;
-const NUMBER_OUTPUTS: usize = 1;
-
-#[allow(clippy::excessive_precision, clippy::unreadable_literal)]
-static EVAL_HIDDEN_BIAS: [f32; NUMBER_HIDDEN] = include!("model/hidden_bias_0");
-
-#[allow(clippy::excessive_precision, clippy::unreadable_literal)]
-static EVAL_HIDDEN_WEIGHTS: [[f32; NUMBER_HIDDEN]; STATE_NUMBER_INPUTS] =
-    include!("model/hidden_weights_0");
-
-#[allow(clippy::excessive_precision, clippy::unreadable_literal)]
-static EVAL_OUTPUT_WEIGHTS: [[f32; NUMBER_HIDDEN]; NUMBER_OUTPUTS] =
-    include!("model/output_weights");
 
 const POLICY_NUMBER_INPUTS: usize = state::NUMBER_FEATURES;
 
