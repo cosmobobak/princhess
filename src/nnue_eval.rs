@@ -53,9 +53,6 @@ const QA: i32 = 255;
 const QB: i32 = 64;
 const QAB: i32 = QA * QB;
 
-/// The size of the stack used to store the activations of the hidden layer.
-const ACC_STACK_SIZE: usize = 256;
-
 pub trait Activation {
     const ACTIVATE: bool;
     type Reverse: Activation;

@@ -112,13 +112,9 @@ fn run_nets(state: &State, moves: &MoveList) -> (f32, Vec<f32>) {
     math::softmax(&mut evalns);
 
     let mut nnue_buffer = NNUEState::new();
-    let raw_value = nnue_buffer.forward(state.board());
-    // double the eval so that we can apply sigmoid but get tanh
-    let raw_value_for_sigmoid = raw_value as f32 * 2.;
-    // apply sigmoid
-    let value = 1. / (1. + fastapprox::faster::exp(-raw_value_for_sigmoid));
-    // shift into [-1, 1]
-    let value = 2. * value - 1.;
+    let value = nnue_buffer.forward(state.board()) as f32;
+    let activated = 1. / (1. + (-value).exp());
+    let value = activated * 2. - 1.;
 
     (value, evalns)
 }
