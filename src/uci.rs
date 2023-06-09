@@ -12,7 +12,7 @@ use crate::transposition_table::TranspositionTable;
 
 pub type Tokens<'a> = SplitWhitespace<'a>;
 
-const ENGINE_NAME: &str = "Princhess";
+const ENGINE_NAME: &str = "Princhess (using gemstone nn)";
 const ENGINE_AUTHOR: &str = "Princess Lana";
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
