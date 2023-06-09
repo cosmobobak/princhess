@@ -112,7 +112,7 @@ fn run_nets(state: &State, moves: &MoveList) -> (f32, Vec<f32>) {
     math::softmax(&mut evalns);
 
     let mut nnue_buffer = NNUEState::new();
-    let value = nnue_buffer.forward(state.board()) as f32;
+    let value = nnue_buffer.forward(state.board()) as f32 / 400.0;
     let activated = 1. / (1. + (-value).exp());
     let value = activated * 2. - 1.;
 
