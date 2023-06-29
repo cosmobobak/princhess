@@ -172,8 +172,8 @@ impl<'a> MoveInfoHandle<'a> {
         self.hot.policy
     }
 
-    pub fn visits(self) -> u64 {
-        u64::from(self.hot.visits.load(Ordering::Relaxed))
+    pub fn visits(self) -> u32 {
+        self.hot.visits.load(Ordering::Relaxed)
     }
 
     pub fn sum_rewards(self) -> i64 {
@@ -482,12 +482,14 @@ impl SearchTree {
         println!("{info_str}");
     }
 
+    pub fn eval(&self) -> f32 {
+        self.principal_variation(1).get(0).map_or(0., |x| {
+            (x.sum_rewards() / i64::from(x.visits())) as f32 / SCALE
+        })
+    }
+
     fn eval_in_cp(&self) -> String {
-        eval_in_cp(
-            self.principal_variation(1)
-                .get(0)
-                .map_or(0., |x| (x.sum_rewards() / x.visits() as i64) as f32 / SCALE),
-        )
+        eval_in_cp(self.eval())
     }
 }
 

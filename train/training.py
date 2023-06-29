@@ -11,6 +11,7 @@ from numpy import array2string
 from scipy.sparse import vstack
 from tensorflow import keras
 from tensorflow.keras import activations, layers, regularizers
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tensorflow.nn import softmax_cross_entropy_with_logits
 
 # pieces + last capture + threats
@@ -29,11 +30,12 @@ POLICY_EPOCHS = TRAIN_TIME_MINUTES // POLICY_EPOCH_TIME_MINUTES
 
 BATCH_SIZE = 16384
 
+
 def load_npy_file(fname, values):
     data = numpy.load(fname, allow_pickle=True)
 
     x = data.item().get("features")
-    y = data.item().get(values)
+    y = values(data.item())
 
     out, inp = sklearn.utils.shuffle(y, x)
 
@@ -61,8 +63,12 @@ def generate_npy_batches(files, values):
                     actual_batch_size = input.shape[0] // batches + 1
 
                     for local_index in range(0, input.shape[0], actual_batch_size):
-                        input_local = input[local_index : (local_index + actual_batch_size)]
-                        output_local = output[local_index : (local_index + actual_batch_size)]
+                        input_local = input[
+                            local_index : (local_index + actual_batch_size)
+                        ]
+                        output_local = output[
+                            local_index : (local_index + actual_batch_size)
+                        ]
 
                         if hasattr(input_local, "todense"):
                             input_local = input_local.todense()
@@ -94,14 +100,28 @@ def build_model(hidden_layers=HIDDEN_LAYERS, *, output_layers, output_activation
 
 def train_state(files, model, start_epoch):
     train_files = list(glob.glob(files))
-    train_generator = generate_npy_batches(files=train_files, values="wdl")
+
+    def wdl_eval_mix(d):
+        wdl = d.get("wdl") * 0.9
+        evl = d.get("evl").reshape(-1, 1) * 0.1
+
+        return wdl + evl
+
+    train_generator = generate_npy_batches(files=train_files, values=wdl_eval_mix)
 
     if not model:
         model = build_model(output_layers=1, output_activation="tanh")
     else:
         model.summary()
 
-    optimizer = keras.optimizers.Adam(learning_rate=0.001)
+    steps_per_epoch = int(len(train_files) * ENTRIES_PER_FILE / BATCH_SIZE)
+
+    lr_schedule = ExponentialDecay(
+        initial_learning_rate=0.001,
+        decay_steps=steps_per_epoch,
+        decay_rate=1 - 1 / STATE_EPOCHS,
+    )
+    optimizer = keras.optimizers.legacy.Adam(learning_rate=lr_schedule)
 
     model.compile(optimizer=optimizer, loss="mean_squared_error")
 
@@ -113,8 +133,6 @@ def train_state(files, model, start_epoch):
         + "x1.e{epoch:03d}-l{loss:.2f}.h5",
         verbose=True,
     )
-
-    steps_per_epoch = int(len(train_files) * ENTRIES_PER_FILE / BATCH_SIZE)
 
     model.fit(
         train_generator,
@@ -164,7 +182,9 @@ def policy_acc(target, output):
 def train_policy(files, model, start_epoch):
     outputs = 384
     train_files = list(glob.glob(files))
-    train_generator = generate_npy_batches(files=train_files, values="moves")
+    train_generator = generate_npy_batches(
+        files=train_files, values=lambda d: d.get("moves")
+    )
 
     if not model:
         model = keras.Sequential()
