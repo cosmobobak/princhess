@@ -34,3 +34,6 @@ train/current
 train/state_tuning
 train/tuning_plots
 train/tuning_*/
+*.exe
+*.epd
+*.pgn

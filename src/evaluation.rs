@@ -1,3 +1,4 @@
+
 use shakmaty::{MoveList, Position};
 use shakmaty_syzygy::Wdl;
 use std::mem::{self, MaybeUninit};
@@ -46,7 +47,7 @@ impl Flag {
 }
 
 pub fn evaluate_state(state: &State) -> i64 {
-    let state_evaluation = (run_eval_net(state) * SCALE) as i64;
+    let state_evaluation = (quiescence(state, -1_000_000.0, 1_000_000.0) * SCALE) as i64;
     state
         .side_to_move()
         .fold_wb(state_evaluation, -state_evaluation)
@@ -95,6 +96,34 @@ const POLICY_NUMBER_INPUTS: usize = state::NUMBER_FEATURES;
 
 #[allow(clippy::excessive_precision, clippy::unreadable_literal)]
 static POLICY_WEIGHTS: [[f32; POLICY_NUMBER_INPUTS]; 384] = include!("policy/output_weights");
+
+fn quiescence(state: &State, mut alpha: f32, beta: f32) -> f32 {
+    let stand_pat = run_eval_net(state);
+    if stand_pat >= beta {
+        return stand_pat;
+    }
+    if alpha < stand_pat {
+        alpha = stand_pat;
+    }
+    let mut best_score = stand_pat;
+    let mut moves = state.board().capture_moves();
+    moves.sort_unstable_by_key(|m| -(m.capture().unwrap() as i32) * 1000 + m.role() as i32);
+    for m in moves {
+        let mut next_state = state.clone();
+        next_state.make_move(&m);
+        let score = -quiescence(&next_state, -beta, -alpha);
+        if score >= beta {
+            return score;
+        }
+        if score > best_score {
+            best_score = score;
+            if score > alpha {
+                alpha = score;
+            }
+        }
+    }
+    best_score
+}
 
 fn run_eval_net(state: &State) -> f32 {
     let mut hidden_layer: [f32; NUMBER_HIDDEN] = unsafe {
